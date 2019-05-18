@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 from metrics import *
 
-def evaluate(predict_path, answer_path, average=False, is_target_with_header=False, is_ranked_list_with_header=False, ranked_list_cols=None):
+
+def evaluate(predict_path, answer_path, sort_by_col=None, average=False, is_target_with_header=False, is_ranked_list_with_header=False, ranked_list_cols=None, debug=False):
     """
     Parameters:
     ----------
@@ -30,24 +31,49 @@ def evaluate(predict_path, answer_path, average=False, is_target_with_header=Fal
     
     df_pre = pd.read_csv(predict_path, header=None)
     df_ans = pd.read_csv(answer_path, header=None)
+    if debug:
+        print("answer info:",df_ans.shape,'\n')
+        print(df_ans.head(3))
+        print("\n------\n")
+        print("prediction info:",df_pre.shape,'\n')
+        print(df_pre.head(3))
 
     # drop [user_id, event_time]
     if is_target_with_header:
-        targets = df_ans.loc[1:,1] # drop header and choose the column of targets
+        targets = df_ans.loc[1:,:] # drop header
     else:
-        targets = df_ans.loc[:,1] # choose the column of targets
+        targets = df_ans.loc[:,:] # retain header
     
     if is_ranked_list_with_header:
         ranked_lists = df_pre.loc[1,:] # drop header
     else:
-        ranked_lists = df_pre.loc[:,:] 
+        ranked_lists = df_pre.loc[:,:] # drop header
 
+    if sort_by_col == None:
+        targets = targets.loc[:,1]
+    else:
+        targets.sort_values(by=sort_by_col,inplace=True)
+        ranked_lists.sort_values(by=sort_by_col,inplace=True)
+        if debug:
+            print("\n====================================================\n")
+            print("check sorting result")
+            print("target (first, last):",targets.head(1)[sort_by_col].values[0],targets.tail(1)[sort_by_col].values[0])
+            print("predict (first, last):",ranked_lists.head(1)[sort_by_col].values[0],ranked_lists.tail(1)[sort_by_col].values[0])
+        targets = targets.loc[:,1]
+        
     if ranked_list_cols:
         ranked_lists = ranked_lists.loc[:,ranked_list_cols]  # choose columns of ranked items
 
     targets = targets.values.astype(int) # convert dataFrame to list
     ranked_lists = ranked_lists.values.astype(int)
-    
+    if debug:
+        print("\n====================================================\n")
+        print("targets info:",targets.shape,targets.dtype,'\n')
+        print(targets[:3])
+        print("\n------\n")
+        print("\nranked_lists info:",ranked_lists.shape,ranked_lists.dtype,'\n')
+        print(ranked_lists[:3])
+
     # get scores of list/average
     hr = get_hit_ratio(ranked_lists,targets,average)
     mrr = get_MRR(ranked_lists,targets,average)
