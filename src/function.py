@@ -84,12 +84,12 @@ def save_ids_vecs_to_csv(ids, vecs, path):
     """
     Parameters:
     ----------
-    ids: a list of ids, such as [1,2,3,4]
-    values: a list of vectors, such as [[1,2], [2,3], [3,4]]
+    ids: a n*1 list/numpy_list of ids, such as [1,2,3,4] or array([1,2,3,4])
+    values: a n*m matrix, such as [[1,2], [2,3], [3,4]]
     path: path to save
     """
     df = pd.DataFrame(data=np.asarray(vecs),index=ids)
-    df.to_csv(path)
+    df.to_csv(path, header=False)
     
 def save_dict_to_csv(rec_dic, path):
     """
@@ -104,9 +104,14 @@ def save_dict_to_csv(rec_dic, path):
     """
     ids,vecs = zip(*rec_dic.items())
     save_ids_vecs_to_csv(ids, vecs, path)
-    
-def load_csv_to_dict(path):
-    df = pd.read_csv(path, index_col=0)
-    keys = df.index.astype(str)
+
+
+def load_csv_to_ids_vectors(path):
+    df = pd.read_csv(path, index_col=0, header=None)
+    keys = np.asarray(df.index.astype(str))
     values = df.values
+    return keys, values
+
+def load_csv_to_dict(path):
+    keys, values = load_csv_to_ids_vectors(path)
     return dict(zip(keys,values))
