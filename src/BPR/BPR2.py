@@ -6,6 +6,8 @@ import csv
 import matplotlib.pyplot as plt
 import pickle
 import math
+import time
+start = time.time()
 mode = 'movielens'
 #mode = 'et'
 mode1 = 'impli'
@@ -33,14 +35,8 @@ def predict_a(W,H,user,item):
                 ans[i][j] = temp
     elif(item==-1):
         ans = np.zeros((len(H)))
-        for i in range(len(H)):
-            temp = np.dot(W[int(user),:],H[int(i),:].T)
-            if(mode1=='impli'):
-                if temp >= 0:
-                    temp = 1.0/(1+np.exp(-temp))
-                else:
-                    temp = np.exp(temp)/(1+np.exp(temp))
-            ans[i] = temp
+        ans = np.dot(W[int(user),:],H.T)
+        ans = np.where(ans>=0,1.0/(1+np.exp(-ans)),np.exp(ans)/(1+np.exp(ans)))
     else:
         ans = np.dot(W[int(user),:],H[int(item),:].T)
         if(mode1=='impli'):
@@ -61,7 +57,6 @@ class BPR(object):
         self.H = H
         self.l = l
         self.r = r
-        self.prob = 0.1
         self.Iter = Iter
     def training(self):
         N = len(self.train)
@@ -114,19 +109,16 @@ class BPR(object):
             mse += (i[2]-y_hat)**2
         return error/len(train) , mse/len(train)
     def add_new_rate(self,rating):
-        y_hat = self.predict(rating[0],rating[1])
-        P = np.tanh(np.power((y_hat-rating[2]),2))
-        if(P>self.prob):
-            self.trainMatrix[rating[0],rating[1]] = 1
-            temp = list(self.train)
-            temp.append(rating)
-            self.train=np.array(temp)
-            itemList = self.trainMatrix.getrowview(int(rating[0])).rows[0]
-            for i in range(self.Iter):
-                random.shuffle(itemList)
-                for j in range(len(itemList)):
-                    k = itemList[j]
-                    self.update(int(rating[0]), int(k))
+        self.trainMatrix[rating[0],rating[1]] = 1
+        temp = list(self.train)
+        temp.append(rating)
+        self.train=np.array(temp)
+        itemList = self.trainMatrix.getrowview(int(rating[0])).rows[0]
+        for i in range(self.Iter):
+            random.shuffle(itemList)
+            for j in range(len(itemList)):
+                k = itemList[j]
+                self.update(int(rating[0]), int(k))
                 
         
 
@@ -160,61 +152,49 @@ if(mode=='movielens'):
     us = int(np.max(c[:, 0])+1)
     it = int(np.max(c[:, 1])+1)
     print("Using movielens")
-if(mode=='et'):
-    train = pd.read_csv('et_t.csv',header=None)
-    update = pd.read_csv('et_u.csv',header=None)
-    test = pd.read_csv('et_eva.csv',header=None)
-    train = np.array(train)
-    update = np.array(update)
-    test = np.array(test)
-    c = np.r_[train,update,test]
-    us = int(np.max(c[:, 0])+1)
-    it = int(np.max(c[:, 1])+1)
-    print("Using ET")
-
-
 
 trainMatrix = sp.lil_matrix((us, it))
 for i in train:
 	trainMatrix[i[0],i[1]] = 1
 
 np.random.seed(7)
-f = 100
+f = 10
 l = 0.01
 r = 0.01
-Iter = 10
-#W = np.random.rand(us, f,)
-#H = np.random.rand(it, f,)
-W = np.random.normal(0.0,0.1,f*us).reshape((us,f))
-H = np.random.normal(0.0,0.1,f*it).reshape((it,f))
+Iter = 100
+W = np.random.rand(us, f,)
+H = np.random.rand(it, f,)
 
+end = time.time()
+print("Start Training : ",end-start)
+start = end
 Model = BPR(test,train,trainMatrix,us,it,f,W,H,l,r,Iter)
 Model.training()
-print("Before update",cal_out(test,Model.W,Model.H))
-print("Output predict after training")
-
-out1 = []
+end = time.time()
+print("Training cost : ",end-start)
+start = end
+out1=[]
 for i in range(len(test)):
     if i %1000 ==0:
         print("epoch : ",i)
         ans = cal_out(test,Model.W,Model.H)
         print("a_error(out)",ans)
-    temp = np.argsort(-predict_a(W,H,test[i][0],-1))[:100].tolist()
-    temp.insert(0,test[i][3])
-    temp.insert(0,test[i][0])
-    out1.append(temp)
+    temp = np.argsort(-predict_a(Model.W,Model.H,test[i][0],-1))[:100].tolist()
+    ans = np.where(temp==test[1])
+    if(len(ans[0])>0):
+        out1.append(ans[0][0])
+    else:
+        out1.append(0)
     Model.add_new_rate(test[i])
+end = time.time()
+print("Updating cost : ",end-start)
 print("After update",cal_out(test,Model.W,Model.H))
 
-with open('1.csv', 'w') as csvfile:
+
+with open('2.csv', 'w') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(out1)
 
 
-# for i in test:
-#     a = int(i[0])
-#     b = int(i[1])
-#     y_hat = X[a, b]
-#     i[3] = y_hat
 
-# np.savetxt('bpr_result', test, fmt='%.2f')
+
